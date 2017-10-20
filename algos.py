@@ -12,7 +12,7 @@ import numpy as np
 def read(file):
     with open(file, 'r') as input:
         n = int(next(input))
-        E = np.zeros(shape=(n,n))
+        E = np.zeros(shape=(n,n), dtype=np.int)
         i = 0
         for line in input:
             j = 0
@@ -22,18 +22,22 @@ def read(file):
             i = i + 1
     return (n, E)
 
-def lineValue(l, limit):
+def lineValue(l, V, limit):
     c = 0
+    i = 0
     for k in l:
-        if (k == 1):
-            c = c + 1
+        if (k):
+            # We check if i is not a removed node
+            if (i in V):
+                c += 1
         if (c > limit):
             return -1
+        i += 1
     return c
 
 def removeNeighbors(E, V, u):
     for i in range(len(E[u])):
-        if (E[u][i] == 1):
+        if (E[u][i]):
             if (i in V):
                 V.remove(i)
     V.remove(u)
@@ -43,8 +47,12 @@ def seekMaximumDegree(E, V):
     uMax = 0
     for i in V:
         c = 0
+        n = 0
         for j in E[i]:
-            c = c + j
+            # We check if i is not a removed node
+            if (j and (n in V)):
+                c = c + 1
+            n += 1
         if (c > max):
             uMax = i
             max = c
@@ -52,26 +60,28 @@ def seekMaximumDegree(E, V):
 
 def seekSmallVertex(E, V, limit):
     for i in V:
-        d = lineValue(E[i], limit)
+        d = lineValue(E[i], V, limit)
         if (d == 0):
-            return (i, d)
+            return (i, 0)
         if (d == 1):
-            return (i, d)
+            return (i, 1)
         if (d == 2):
-            return (i, d)
+            return (i, 2)
     return (-1, -1)
 
 # ==========================
             
 # Algo R0
 def algoR0(E, V):
+    global calls
     # If the graph is empty
     if (not V):
         return 0
     # If the graph has an isolated vertex
-    v, d = seekSmallVertex(E, V, 0);
+    v, d = seekSmallVertex(E, V, 0)
     if (d == 0):
         V.remove(v);
+        calls += 1
         return 1 + algoR0(E, V)
     # Otherwise
     # Find maximum degree
@@ -79,10 +89,12 @@ def algoR0(E, V):
     V2 = list(V)
     V2.remove(u)
     removeNeighbors(E, V, u)
+    calls += 2
     return max(1 + algoR0(E, V), algoR0(E, V2))
 
 # Algo R1
 def algoR1(E, V):
+    global calls
     # If the graph is empty
     if (not V):
         return 0
@@ -90,9 +102,11 @@ def algoR1(E, V):
     v, d = seekSmallVertex(E, V, 1);
     if (d == 0):
         V.remove(v);
+        calls += 1
         return 1 + algoR1(E, V)
     if (d == 1):
         removeNeighbors(E, V, v)
+        calls += 1
         return 1 + algoR1(E, V)
     # Otherwise
     # Find maximum degree
@@ -100,49 +114,73 @@ def algoR1(E, V):
     V2 = list(V)
     V2.remove(u)
     removeNeighbors(E, V, u)
+    calls += 2
     return max(1 + algoR1(E, V), algoR1(E, V2))
 
 # AlgoR2
 def algoR2(E, V):
+    global calls
     # If the graph is empty
     if (not V):
         return 0
     v, d = seekSmallVertex(E, V, 2);
     if (d == 0):
         V.remove(v);
+        calls += 1
         return 1 + algoR2(E, V)
     if (d == 1):
         removeNeighbors(E, V, v)
+        calls += 1
         return 1 + algoR2(E, V)
     if (d == 2):
         u = -1
         w = -1
         for i in range(len(E[v])):
-            if (i == 1):
-                if (u == -1):
-                    u = i
-                else:
-                    w = i
-        # if u and w neighbors
+            # We check if i is not a removed node
+            if (E[v][i] == 1):
+                if (i in V):
+                    if (u == -1):
+                        u = i
+                    else:
+                        w = i
+        # If u and w neighbors
         if (E[u][w] == 1):
             V.remove(u)
             V.remove(w)
+            V.remove(v)
+            calls += 1
             return 1 + algoR2(E, V)
         else:
-            removeNeighbors(E, V, v)
-            for i in range(len(E[u])):
-                E[v][i] = E[u][i] or E[w][i] #cast int?
-            E[v][v] = 0
-            return 1 + algoR2(E, V)
+            E2 = np.copy(E)
+            n = len(E[0])
+            z = np.zeros(shape=(1,n), dtype=np.int)
+            E2 = np.append(E2, z, axis=0)
+            z = np.append(z, 0)
+            z.resize(n+1,1)
+            E2 = np.append(E2, z, axis=1)
+            for i in range(n):
+                if (E2[u][i] or E2[w][i]):
+                    E2[n][i] = 1
+                    E2[i][n] = 1
+            #removeNeighbors(E, V, v)
+            V.remove(u)
+            V.remove(w)
+            V.remove(v)
+            V.append(n)
+            calls += 1
+            return 1 + algoR2(E2, V)
     # Otherwise
     # Find maximum degree
     u = seekMaximumDegree(E, V)
     V2 = list(V)
     V2.remove(u)
     removeNeighbors(E, V, u)
+    calls += 2
     return max(1 + algoR2(E, V), algoR2(E, V2))
 
 # Main
-(n, E) = read('data/g30.in')
+calls = 0
+(n, E) = read('data/g100.in')
 verticles = [i for i in range(n)]
-print algoR1(E, verticles)
+print algoR2(E, verticles)
+print calls
